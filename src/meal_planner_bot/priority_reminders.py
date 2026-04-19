@@ -21,6 +21,16 @@ WEEKDAY_LABELS = {
 }
 
 
+def format_priority_label(priority: int) -> str:
+    labels = {
+        0: "совсем не нравится, не готовим больше",
+        1: "не нравится, но можно приготовить",
+        2: "нравится",
+        3: "очень нравится",
+    }
+    return f"{priority} ({labels.get(priority, 'неизвестно')})"
+
+
 def build_priority_keyboard(dish_id: int) -> InlineKeyboardMarkup:
     buttons = [
         InlineKeyboardButton(text="0", callback_data=f"priority:set:{dish_id}:0"),
@@ -45,7 +55,7 @@ def format_priority_prompt(dish: Dish) -> str:
         f"ID: {dish.id}",
         f"Тип: {dish.dish_type}",
         f"Заказывали: {dish.order_count} раз",
-        f"Текущий приоритет: {dish.priority}",
+        f"Текущий приоритет: {format_priority_label(dish.priority)}",
         f"Последний заказ: {dish.last_ordered_at or 'не указан'}",
         f"Не рекомендовать до: {dish.do_not_recommend_until or 'не указано'}",
     ]

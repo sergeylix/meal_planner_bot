@@ -52,7 +52,7 @@ ADMIN_USER_IDS=123456789,987654321
 - приоритеты блюд и счетчик заказов
 - дату последнего заказа и дату паузы рекомендаций
 - рекомендации набора из `супа`, `второго` и `салата`
-- авто-запрос приоритета для блюд из последнего заказа
+- автооценку заказанных блюд из последнего заказа
 
 ## Справочник блюд
 
@@ -93,7 +93,7 @@ env PYTHONPATH=src .venv/bin/python3 -m meal_planner_bot.seed_dishes
 /suggest
 /add_dish <тип> | <название> | [ссылка] | [комментарий]
 /update_last_ordered <id|slug|название> | [YYYY-MM-DD]
-/set_priority_prompt_schedule <день_недели> <HH:MM>
+/set_dishes_review_schedule <день_недели> <HH:MM>
 ```
 
 Команды в меню Telegram:
@@ -110,9 +110,9 @@ env PYTHONPATH=src .venv/bin/python3 -m meal_planner_bot.seed_dishes
 - `/whoami`
 - `/add_dish`
 - `/update_last_ordered`
-- `/set_priority_prompt_schedule`
+- `/set_dishes_review_schedule`
 
-Сейчас `/add_dish`, `/update_last_ordered` и `/set_priority_prompt_schedule` доступны только администратору.
+Сейчас `/add_dish`, `/update_last_ordered` и `/set_dishes_review_schedule` доступны только администратору.
 
 `/update_last_ordered` не только обновляет дату последнего заказа и увеличивает счетчик заказов блюда, но и ставит дату паузы рекомендаций на 14 дней вперед.
 
@@ -146,7 +146,7 @@ env PYTHONPATH=src .venv/bin/python3 -m meal_planner_bot.seed_dishes
 
 После замены пересчитывается только выбранный тип блюда, а текущее выбранное блюдо этого типа исключается из кандидатов, чтобы оно не выпало снова.
 
-## Авто-запрос приоритета
+## Автооценка Заказанных Блюд
 
 Бот сам присылает администраторам блюда из последнего заказа и просит выбрать приоритет кнопками `0`, `1`, `2`, `3` или `Отмена`.
 
@@ -157,5 +157,5 @@ env PYTHONPATH=src .venv/bin/python3 -m meal_planner_bot.seed_dishes
 Изменить расписание можно скрытой админ-командой:
 
 ```text
-/set_priority_prompt_schedule пятница 14:00
+/set_dishes_review_schedule пятница 14:00
 ```

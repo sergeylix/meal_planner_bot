@@ -3,6 +3,7 @@ from datetime import date, datetime
 from typing import Optional
 
 from aiogram import F, Router
+from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, User
 
@@ -85,6 +86,18 @@ def _parse_weekday(value: str) -> Optional[int]:
     return weekday_map.get(normalized)
 
 
+def _format_priority_label(priority: Optional[int]) -> str:
+    priority_labels = {
+        0: "совсем не нравится, не готовим больше",
+        1: "не нравится, но можно приготовить",
+        2: "нравится",
+        3: "очень нравится",
+    }
+    if priority is None:
+        return "не указан"
+    return f"{priority} ({priority_labels.get(priority, 'неизвестно')})"
+
+
 def _encode_suggestion_ids(suggestions: dict[str, Optional[Dish]]) -> Optional[str]:
     soup = suggestions.get("суп")
     main = suggestions.get("второе")
@@ -127,17 +140,26 @@ def _suggestion_replace_keyboard(encoded_ids: str) -> InlineKeyboardMarkup:
 
 
 def _format_suggestion_text(suggestions: dict[str, Optional[Dish]]) -> str:
-    lines = ["Рекомендация на сегодня:"]
+    headers = {
+        "суп": "🍲 <b>Суп</b>",
+        "второе": "🍽️ <b>Второе</b>",
+        "салат": "🥗 <b>Салат</b>",
+    }
+    lines = ["✨ <b>Рекомендация на сегодня</b>", ""]
     for dish_type in ("суп", "второе", "салат"):
         dish = suggestions.get(dish_type)
         if dish is None:
-            lines.append(f"{dish_type.title()}: подходящих блюд не найдено")
+            lines.append(f"{headers[dish_type]}")
+            lines.append("- Подходящих блюд не найдено")
+            lines.append("")
             continue
-        lines.append(
-            f"{dish_type.title()}: {dish.name} "
-            f"(ID: {dish.id}, приоритет: {dish.priority}, заказов: {dish.order_count}, "
-            f"последний заказ: {dish.last_ordered_at or 'не указан'})"
-        )
+        lines.append(headers[dish_type])
+        lines.append(f"- <b>{escape(dish.name)}</b>")
+        lines.append(f"- ID: <code>{dish.id}</code>")
+        lines.append(f"- Приоритет: <code>{escape(_format_priority_label(dish.priority))}</code>")
+        lines.append(f"- Заказывали: <code>{dish.order_count}</code> раз")
+        lines.append(f"- Последний заказ: <code>{escape(dish.last_ordered_at or 'не указан')}</code>")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -164,19 +186,12 @@ def _build_slug(name: str) -> str:
 
 
 def _format_dish_details(dish: Dish) -> str:
-    priority_labels = {
-        0: "0 - совсем не нравится, не готовим больше",
-        1: "1 - не нравится, но можно приготовить",
-        2: "2 - нравится",
-        3: "3 - очень нравится",
-    }
     lines = [
         f"Название: {dish.name}",
         f"ID: {dish.id}",
         f"Тип: {dish.dish_type}",
         f"Заказывали: {dish.order_count} раз",
-        f"Приоритет: {dish.priority}",
-        f"Описание приоритета: {priority_labels.get(dish.priority, 'неизвестно')}",
+        f"Приоритет: {_format_priority_label(dish.priority)}",
         f"Последний заказ: {dish.last_ordered_at or 'не указан'}",
         f"Не рекомендовать до: {dish.do_not_recommend_until or 'не указано'}",
     ]
@@ -238,7 +253,7 @@ async def help_handler(message: Message, access_repo: AccessRepository, admin_us
             "/suggest - предложить 3 блюда: суп, второе и салат\n"
             "/add_dish <тип> | <название> | [ссылка] | [комментарий] - добавить блюдо\n"
             "/update_last_ordered <id|slug|название> | [YYYY-MM-DD] - обновить дату заказа\n"
-            "/set_priority_prompt_schedule [день_недели HH:MM] - показать или изменить расписание запроса приоритета"
+            "/set_dishes_review_schedule [день_недели HH:MM] - показать или изменить расписание оценки заказанных блюд"
         )
         return
 
@@ -307,7 +322,7 @@ async def dishes_handler(
         for dish in grouped[dish_type]:
             meta = []
             if dish.priority != 2:
-                meta.append(f"приоритет: {dish.priority}")
+                meta.append(f"приоритет: {_format_priority_label(dish.priority)}")
             if dish.order_count:
                 meta.append(f"заказов: {dish.order_count}")
             if dish.last_ordered_at:
@@ -369,11 +384,15 @@ async def suggest_handler(
         return
     encoded_ids = _encode_suggestion_ids(suggestions)
     reply_markup = _suggestion_keyboard(encoded_ids) if encoded_ids else None
-    await message.answer(_format_suggestion_text(suggestions), reply_markup=reply_markup)
+    await message.answer(
+        _format_suggestion_text(suggestions),
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+    )
 
 
-@router.message(Command("set_priority_prompt_schedule"))
-async def set_priority_prompt_schedule_handler(
+@router.message(Command(commands=["set_dishes_review_schedule", "set_priority_prompt_schedule"]))
+async def set_dishes_review_schedule_handler(
     message: Message,
     command: CommandObject,
     settings_repo: SettingsRepository,
@@ -390,9 +409,9 @@ async def set_priority_prompt_schedule_handler(
     current_schedule = settings_repo.get_priority_prompt_schedule()
     if not raw_args:
         await message.answer(
-            "Текущее расписание запроса приоритета:\n"
+            "Текущее расписание оценки заказанных блюд:\n"
             f"{format_schedule_text(current_schedule.weekday, current_schedule.time_utc)}\n\n"
-            "Изменить: /set_priority_prompt_schedule пятница 14:00\n"
+            "Изменить: /set_dishes_review_schedule пятница 14:00\n"
             "Можно использовать weekday как число 0-6, русское или английское название."
         )
         return
@@ -400,8 +419,8 @@ async def set_priority_prompt_schedule_handler(
     parts = raw_args.split()
     if len(parts) != 2:
         await message.answer(
-            "Использование: /set_priority_prompt_schedule <день_недели> <HH:MM>\n"
-            "Пример: /set_priority_prompt_schedule пятница 14:00"
+            "Использование: /set_dishes_review_schedule <день_недели> <HH:MM>\n"
+            "Пример: /set_dishes_review_schedule пятница 14:00"
         )
         return
 
@@ -587,10 +606,18 @@ async def suggest_callback_handler(
             if updated_dish is not None:
                 updated_dishes.append(updated_dish.name)
 
+        updated_suggestions = {
+            "суп": dish_repo.get_by_id(decoded_ids["суп"]),
+            "второе": dish_repo.get_by_id(decoded_ids["второе"]),
+            "салат": dish_repo.get_by_id(decoded_ids["салат"]),
+        }
+
         await callback.message.edit_text(
-            f"{callback.message.text}\n\n"
-            f"Вы выбрали этот набор. Дата заказа обновлена: {ordered_at}.\n"
-            f"Зафиксированы блюда: {', '.join(updated_dishes)}."
+            f"{_format_suggestion_text(updated_suggestions)}\n\n"
+            f"✅ <b>Вы выбрали этот набор.</b>\n"
+            f"Дата заказа обновлена: <code>{ordered_at}</code>\n"
+            f"Зафиксированы блюда: {escape(', '.join(updated_dishes))}.",
+            parse_mode=ParseMode.HTML,
         )
         await callback.answer("Набор выбран")
         return
@@ -652,6 +679,7 @@ async def suggest_callback_handler(
         await callback.message.edit_text(
             _format_suggestion_text(updated_suggestions),
             reply_markup=_suggestion_keyboard(new_encoded_ids),
+            parse_mode=ParseMode.HTML,
         )
         await callback.answer("Блюдо заменено")
         return
