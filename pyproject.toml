@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meal-planner-bot"
+version = "0.1.0"
+description = "Telegram bot for storing dishes and suggesting what to order next."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "aiogram>=3.21,<4.0",
+    "python-dotenv>=1.0,<2.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
