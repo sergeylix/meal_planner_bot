@@ -151,12 +151,6 @@ DISH_CATALOG = [
         notes="Просили, чтобы мясо было мягким и его было не слишком много.",
     ),
     DishSeed(
-        name="Гратен с курицей, бататом и пармезаном",
-        slug="chicken_sweet_potato_gratin",
-        dish_type="второе",
-        notes="Нежирный вариант, без сливок.",
-    ),
-    DishSeed(
         name="Оливье с ветчиной и кешью-соусом",
         slug="olivier_with_ham_and_cashew_sauce",
         dish_type="салат",
