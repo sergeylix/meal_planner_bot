@@ -159,3 +159,73 @@ env PYTHONPATH=src .venv/bin/python3 -m meal_planner_bot.seed_dishes
 ```text
 /set_dishes_review_schedule пятница 14:00
 ```
+
+## VPS Deploy
+
+Ниже базовый вариант для Ubuntu VPS с `systemd`.
+
+### 1. Установить системные пакеты
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv
+```
+
+### 2. Подготовить пользователя и окружение
+
+Скрипт для первичной подготовки:
+
+```bash
+chmod +x scripts/bootstrap_vps.sh
+./scripts/bootstrap_vps.sh
+```
+
+По умолчанию он готовит:
+
+- пользователя `mealplanner`
+- директорию `/opt/meal_planner_bot`
+- виртуальное окружение `/opt/meal_planner_bot/.venv`
+
+### 3. Клонировать проект на сервер
+
+```bash
+sudo -u mealplanner git clone git@github.com:sergeylix/meal_planner_bot.git /opt/meal_planner_bot
+```
+
+Если репозиторий уже клонирован, просто обнови его.
+
+### 4. Создать `.env` на сервере
+
+Пример:
+
+```env
+BOT_TOKEN=your_token
+ADMIN_USER_IDS=123456789
+DATABASE_PATH=data/meal_planner_bot.db
+```
+
+### 5. Установить `systemd` unit
+
+Скопируй шаблон:
+
+```bash
+sudo cp deploy/systemd/meal_planner_bot.service /etc/systemd/system/meal_planner_bot.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now meal_planner_bot
+```
+
+### 6. Проверить статус и логи
+
+```bash
+sudo systemctl status meal_planner_bot
+sudo journalctl -u meal_planner_bot -f
+```
+
+### 7. Обновление приложения
+
+Для последующих обновлений можно использовать:
+
+```bash
+chmod +x scripts/deploy_update.sh
+APP_DIR=/opt/meal_planner_bot ./scripts/deploy_update.sh
+```

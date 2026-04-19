@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from meal_planner_bot.config import load_settings
 from meal_planner_bot.database import init_database
 from meal_planner_bot.dish_catalog import DISH_CATALOG

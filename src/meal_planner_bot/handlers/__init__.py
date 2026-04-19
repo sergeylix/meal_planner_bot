@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from aiogram import Router
 
 from meal_planner_bot.handlers.common import router as common_router

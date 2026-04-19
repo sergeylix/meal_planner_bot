@@ -1,0 +1,16 @@
+[Unit]
+Description=Meal Planner Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=mealplanner
+Group=mealplanner
+WorkingDirectory=/opt/meal_planner_bot
+Environment=PYTHONPATH=/opt/meal_planner_bot/src
+ExecStart=/opt/meal_planner_bot/.venv/bin/python3 -m meal_planner_bot
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from html import escape
 from datetime import date, datetime
 from typing import Optional

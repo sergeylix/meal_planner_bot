@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from meal_planner_bot.dishes import DishSeed
 
 
