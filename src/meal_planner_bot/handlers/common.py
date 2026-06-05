@@ -457,18 +457,9 @@ async def suggest_callback_handler(
         await callback.answer()
         return
 
-    if action == "close":
-        await callback.message.edit_reply_markup(reply_markup=None)
-        await callback.answer("Отменено")
-        return
-
     if action == "cancel":
-        decoded_ids = _decode_suggestion_ids(rest[0])
-        if decoded_ids is None:
-            await callback.answer("Не удалось разобрать набор.", show_alert=True)
-            return
-        await callback.message.edit_reply_markup(reply_markup=_suggestion_keyboard(rest[0]))
-        await callback.answer("Изменение отменено")
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.answer("Подбор закрыт")
         return
 
     if action == "replace" and len(rest) == 2:
