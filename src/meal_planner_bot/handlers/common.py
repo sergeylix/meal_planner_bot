@@ -113,7 +113,6 @@ def _format_suggestion_text(suggestions: dict[str, Optional[Dish]]) -> str:
         lines.append(f"- ID: <code>{dish.id}</code>")
         lines.append(f"- Приоритет: <code>{escape(_format_priority_label(dish.priority))}</code>")
         lines.append(f"- Заказывали: <code>{dish.order_count}</code> раз")
-        lines.append(f"- Последний заказ: <code>{escape(dish.last_ordered_at or 'не указан')}</code>")
         lines.append("")
     return "\n".join(lines)
 
