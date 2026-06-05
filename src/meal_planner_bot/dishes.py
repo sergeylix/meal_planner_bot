@@ -273,6 +273,7 @@ class DishRepository:
         dish_type: str,
         today: Optional[date] = None,
         excluded_ids: Optional[set[int]] = None,
+        random_only: bool = False,
     ) -> Optional[Dish]:
         current_date = today or date.today()
         excluded = excluded_ids or set()
@@ -292,6 +293,11 @@ class DishRepository:
                 dish.priority
             )
             scored.append((score, dish))
+
+        if not scored:
+            return None
+        if random_only:
+            return random.choice([dish for _, dish in scored])
 
         scored.sort(key=lambda item: (-item[0], item[1].name))
         top_dishes = [dish for _, dish in scored[:3]]

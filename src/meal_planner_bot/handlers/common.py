@@ -11,8 +11,6 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from meal_planner_bot.access import AccessRepository
 from meal_planner_bot.dishes import Dish, DishRepository, DishSeed
-from meal_planner_bot.priority_reminders import format_priority_prompt, format_schedule_text
-from meal_planner_bot.settings_repository import SettingsRepository
 
 router = Router()
 
@@ -53,41 +51,6 @@ def _has_bot_access(user_id: int, access_repo: AccessRepository, admin_user_ids:
     return user_id in admin_user_ids or access_repo.has_access(user_id)
 
 
-def _parse_weekday(value: str) -> Optional[int]:
-    normalized = value.strip().lower()
-    weekday_map = {
-        "0": 0,
-        "1": 1,
-        "2": 2,
-        "3": 3,
-        "4": 4,
-        "5": 5,
-        "6": 6,
-        "mon": 0,
-        "monday": 0,
-        "понедельник": 0,
-        "tue": 1,
-        "tuesday": 1,
-        "вторник": 1,
-        "wed": 2,
-        "wednesday": 2,
-        "среда": 2,
-        "thu": 3,
-        "thursday": 3,
-        "четверг": 3,
-        "fri": 4,
-        "friday": 4,
-        "пятница": 4,
-        "sat": 5,
-        "saturday": 5,
-        "суббота": 5,
-        "sun": 6,
-        "sunday": 6,
-        "воскресенье": 6,
-    }
-    return weekday_map.get(normalized)
-
-
 def _format_priority_label(priority: Optional[int]) -> str:
     priority_labels = {
         0: "совсем не нравится, не готовим больше",
@@ -118,16 +81,6 @@ def _decode_suggestion_ids(raw_value: str) -> Optional[dict[str, int]]:
         "второе": int(parts[1]),
         "салат": int(parts[2]),
     }
-
-
-def _suggestion_keyboard(encoded_ids: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Выбрать", callback_data=f"suggest:choose:{encoded_ids}")],
-            [InlineKeyboardButton(text="Изменить", callback_data=f"suggest:change:{encoded_ids}")],
-            [InlineKeyboardButton(text="Отмена", callback_data=f"suggest:close:{encoded_ids}")],
-        ]
-    )
 
 
 def _suggestion_replace_keyboard(encoded_ids: str) -> InlineKeyboardMarkup:
@@ -254,8 +207,7 @@ async def help_handler(message: Message, access_repo: AccessRepository, admin_us
             "/dish <id|slug|название> - показать карточку блюда\n"
             "/suggest - предложить 3 блюда: суп, второе и салат\n"
             "/add_dish <тип> | <название> | [ссылка] | [комментарий] - добавить блюдо\n"
-            "/update_last_ordered <id|slug|название> | [YYYY-MM-DD] - обновить дату заказа\n"
-            "/set_dishes_review_schedule [день_недели HH:MM] - показать или изменить расписание оценки заказанных блюд"
+            "/update_last_ordered <id|slug|название> | [YYYY-MM-DD] - обновить дату заказа"
         )
         return
 
@@ -385,62 +337,11 @@ async def suggest_handler(
         await message.answer("Сейчас не получилось подобрать блюда. Проверьте справочник.")
         return
     encoded_ids = _encode_suggestion_ids(suggestions)
-    reply_markup = _suggestion_keyboard(encoded_ids) if encoded_ids else None
+    reply_markup = _suggestion_replace_keyboard(encoded_ids) if encoded_ids else None
     await message.answer(
         _format_suggestion_text(suggestions),
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
-    )
-
-
-@router.message(Command(commands=["set_dishes_review_schedule", "set_priority_prompt_schedule"]))
-async def set_dishes_review_schedule_handler(
-    message: Message,
-    command: CommandObject,
-    settings_repo: SettingsRepository,
-    admin_user_ids: set[int],
-) -> None:
-    user = message.from_user
-    if user is None:
-        return
-    if user.id not in admin_user_ids:
-        await message.answer("Менять расписание может только администратор.")
-        return
-
-    raw_args = (command.args or "").strip()
-    current_schedule = settings_repo.get_priority_prompt_schedule()
-    if not raw_args:
-        await message.answer(
-            "Текущее расписание оценки заказанных блюд:\n"
-            f"{format_schedule_text(current_schedule.weekday, current_schedule.time_utc)}\n\n"
-            "Изменить: /set_dishes_review_schedule пятница 14:00\n"
-            "Можно использовать weekday как число 0-6, русское или английское название."
-        )
-        return
-
-    parts = raw_args.split()
-    if len(parts) != 2:
-        await message.answer(
-            "Использование: /set_dishes_review_schedule <день_недели> <HH:MM>\n"
-            "Пример: /set_dishes_review_schedule пятница 14:00"
-        )
-        return
-
-    weekday = _parse_weekday(parts[0])
-    if weekday is None:
-        await message.answer("Не удалось распознать день недели.")
-        return
-
-    try:
-        datetime.strptime(parts[1], "%H:%M")
-    except ValueError:
-        await message.answer("Время должно быть в формате HH:MM, например 14:00.")
-        return
-
-    settings_repo.set_priority_prompt_schedule(weekday, parts[1])
-    await message.answer(
-        "Расписание обновлено.\n"
-        f"{format_schedule_text(weekday, parts[1])}"
     )
 
 
@@ -536,45 +437,6 @@ async def update_last_ordered_handler(
     )
 
 
-@router.callback_query(F.data.startswith("priority:"))
-async def priority_callback_handler(
-    callback: CallbackQuery,
-    dish_repo: DishRepository,
-    admin_user_ids: set[int],
-) -> None:
-    if callback.from_user is None or callback.message is None or callback.data is None:
-        await callback.answer()
-        return
-
-    if callback.from_user.id not in admin_user_ids:
-        await callback.answer("Недостаточно прав.", show_alert=True)
-        return
-
-    _, action, raw_dish_id, *rest = callback.data.split(":")
-    dish = dish_repo.get_by_id(int(raw_dish_id))
-    if dish is None:
-        await callback.answer("Блюдо не найдено.", show_alert=True)
-        return
-
-    if action == "skip":
-        await callback.message.edit_text(
-            f"{format_priority_prompt(dish)}\n\nИзменение приоритета отменено."
-        )
-        await callback.answer("Отменено")
-        return
-
-    priority = int(rest[0])
-    updated_dish = dish_repo.update_priority(dish.id, priority)
-    if updated_dish is None:
-        await callback.answer("Не удалось обновить приоритет.", show_alert=True)
-        return
-
-    await callback.message.edit_text(
-        f"{format_priority_prompt(updated_dish)}\n\nПриоритет сохранен."
-    )
-    await callback.answer("Приоритет обновлен")
-
-
 @router.callback_query(F.data.startswith("suggest:"))
 async def suggest_callback_handler(
     callback: CallbackQuery,
@@ -593,44 +455,6 @@ async def suggest_callback_handler(
     _, action, *rest = callback.data.split(":")
     if not rest:
         await callback.answer()
-        return
-
-    if action == "choose":
-        decoded_ids = _decode_suggestion_ids(rest[0])
-        if decoded_ids is None:
-            await callback.answer("Не удалось разобрать выбор.", show_alert=True)
-            return
-
-        ordered_at = date.today().isoformat()
-        updated_dishes = []
-        for dish_id in decoded_ids.values():
-            updated_dish = dish_repo.update_last_ordered(dish_id, ordered_at)
-            if updated_dish is not None:
-                updated_dishes.append(updated_dish.name)
-
-        updated_suggestions = {
-            "суп": dish_repo.get_by_id(decoded_ids["суп"]),
-            "второе": dish_repo.get_by_id(decoded_ids["второе"]),
-            "салат": dish_repo.get_by_id(decoded_ids["салат"]),
-        }
-
-        await callback.message.edit_text(
-            f"{_format_suggestion_text(updated_suggestions)}\n\n"
-            f"✅ <b>Вы выбрали этот набор.</b>\n"
-            f"Дата заказа обновлена: <code>{ordered_at}</code>\n"
-            f"Зафиксированы блюда: {escape(', '.join(updated_dishes))}.",
-            parse_mode=ParseMode.HTML,
-        )
-        await callback.answer("Набор выбран")
-        return
-
-    if action == "change":
-        decoded_ids = _decode_suggestion_ids(rest[0])
-        if decoded_ids is None:
-            await callback.answer("Не удалось разобрать набор.", show_alert=True)
-            return
-        await callback.message.edit_reply_markup(reply_markup=_suggestion_replace_keyboard(rest[0]))
-        await callback.answer("Выберите, что заменить")
         return
 
     if action == "close":
@@ -662,7 +486,11 @@ async def suggest_callback_handler(
             return
 
         excluded_id = decoded_ids[dish_type]
-        new_dish = dish_repo.get_suggestion_for_type(dish_type, excluded_ids={excluded_id})
+        new_dish = dish_repo.get_suggestion_for_type(
+            dish_type,
+            excluded_ids={excluded_id},
+            random_only=True,
+        )
         if new_dish is None:
             await callback.answer("Не нашел другой вариант для замены.", show_alert=True)
             return
@@ -680,7 +508,7 @@ async def suggest_callback_handler(
 
         await callback.message.edit_text(
             _format_suggestion_text(updated_suggestions),
-            reply_markup=_suggestion_keyboard(new_encoded_ids),
+            reply_markup=_suggestion_replace_keyboard(new_encoded_ids),
             parse_mode=ParseMode.HTML,
         )
         await callback.answer("Блюдо заменено")

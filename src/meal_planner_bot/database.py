@@ -54,14 +54,6 @@ def init_database(database_path: Path) -> None:
             )
             """
         )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS bot_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-            """
-        )
         _ensure_column_exists(connection, "dishes", "order_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column_exists(connection, "dishes", "do_not_recommend_until", "TEXT")
         _ensure_column_exists(connection, "dishes", "priority", "INTEGER NOT NULL DEFAULT 2")
@@ -70,14 +62,6 @@ def init_database(database_path: Path) -> None:
             UPDATE dishes
             SET priority = 2
             WHERE priority IS NULL
-            """
-        )
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO bot_settings (key, value)
-            VALUES
-                ('priority_prompt_weekday', '4'),
-                ('priority_prompt_time_utc', '14:00')
             """
         )
         connection.commit()

@@ -11,8 +11,6 @@ from meal_planner_bot.config import load_settings
 from meal_planner_bot.database import init_database
 from meal_planner_bot.dishes import DishRepository
 from meal_planner_bot.handlers import setup_routers
-from meal_planner_bot.priority_reminders import PriorityReminderService
-from meal_planner_bot.settings_repository import SettingsRepository
 
 
 async def setup_bot_commands(bot: Bot) -> None:
@@ -32,7 +30,6 @@ async def run_bot() -> None:
     init_database(settings.database_path)
     access_repo = AccessRepository(settings.database_path)
     dish_repo = DishRepository(settings.database_path)
-    settings_repo = SettingsRepository(settings.database_path)
 
     logging.basicConfig(
         level=logging.INFO,
@@ -41,25 +38,13 @@ async def run_bot() -> None:
 
     bot = Bot(token=settings.bot_token)
     await setup_bot_commands(bot)
-    reminder_service = PriorityReminderService(
-        bot=bot,
-        dish_repo=dish_repo,
-        settings_repo=settings_repo,
-        admin_user_ids=settings.admin_user_ids,
-    )
-    reminder_task = asyncio.create_task(reminder_service.run())
     dispatcher = Dispatcher()
     dispatcher["access_repo"] = access_repo
     dispatcher["dish_repo"] = dish_repo
-    dispatcher["settings_repo"] = settings_repo
     dispatcher["admin_user_ids"] = settings.admin_user_ids
     dispatcher.include_router(setup_routers())
 
-    try:
-        await dispatcher.start_polling(bot)
-    finally:
-        reminder_task.cancel()
-        await asyncio.gather(reminder_task, return_exceptions=True)
+    await dispatcher.start_polling(bot)
 
 
 def main() -> None:
